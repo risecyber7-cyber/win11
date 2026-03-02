@@ -1,59 +1,42 @@
-name: Ultimate-CloudLab-RDP
+name: CloudLab Windows Panel
 
 on:
   workflow_dispatch:
-  schedule:
-    - cron: "0 */6 * * *"
 
 jobs:
-  cloudlab:
+  winlab:
     runs-on: windows-latest
     timeout-minutes: 360
 
     steps:
 
-    - name: Create User
-      run: |
-        net user deva Rise@123 /add
-        net localgroup Administrators deva /add
-
-    - name: Enable Remote Desktop
-      run: |
-        reg add "HKLM\SYSTEM\CurrentControlSet\Control\Terminal Server" /v fDenyTSConnections /t REG_DWORD /d 0 /f
-        Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
-
-    - name: Show Network Info
+    - name: Show System Info
       run: |
         echo ===== IP INFO =====
         ipconfig
         echo ===== PORTS =====
         netstat -ano
 
+    - name: Download Tailscale
+      run: |
+        Invoke-WebRequest https://pkgs.tailscale.com/stable/tailscale-setup-latest.exe -OutFile tailscale.exe
+
     - name: Install Tailscale
       run: |
-        curl -fsSL https://pkgs.tailscale.com/stable/tailscale-setup.exe -o tailscale.exe
         Start-Process .\tailscale.exe -ArgumentList "/S" -Wait
 
     - name: Start Tailscale
       run: |
-        Start-Service Tailscale
-        Start-Sleep -Seconds 5
+        & "C:\Program Files\Tailscale\tailscale.exe" up --authkey ${{ secrets.TS_AUTHKEY }} --accept-routes
 
-    - name: Connect Tailscale
+    - name: Show Tailscale IP
       run: |
-        tailscale up --authkey=${{ secrets.TSKEY_AUTH }} --hostname=cloud-lab-rdp
+        & "C:\Program Files\Tailscale\tailscale.exe" ip
 
-    - name: Keep Server Alive
+    - name: Show RDP Port
       run: |
-        for ($i=1; $i -le 360; $i++) {
-          Write-Output "CloudLab Running Minute $i"
-          Get-Date
-          Start-Sleep -Seconds 60
-        }
+        netstat -ano | findstr 3389
 
-    - name: Auto Restart Workflow
+    - name: Keep Runner Alive
       run: |
-        curl -X POST `
-        -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" `
-        https://api.github.com/repos/${{ github.repository }}/actions/workflows/rdp.yml/dispatches `
-        -d '{"ref":"main"}'
+        ping -t 127.0.0.1
