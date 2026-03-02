@@ -14,7 +14,7 @@ jobs:
 
     - name: Create User
       run: |
-        net user deva rise123 /add
+        net user deva Rise@123 /add
         net localgroup Administrators deva /add
 
     - name: Enable Remote Desktop
